@@ -4,27 +4,40 @@ import numpy as np
 import itertools
 
 
-def init_samples(num_of_samples, random_seed, num_mixture, reward_dist, connect_dist, trans_prob, policy, s_vars, a_vars, horizon):
+def init_samples(num_of_samples, random_seed, num_mixture, reward_dist, connect_dist, trans_prob, policy, s_vars, a_vars, r_vars, horizon):
     '''
     Generate dynamic bayesian network structure.
     '''
+
+    # create variable for factored DBN 
     total_num_vars = len(s_vars) + len(a_vars)
-    means = np.ones((total_num_vars, num_mixture))
-    vars = np.ones((total_num_vars, num_mixture))
 
     f_actions = vgroup.NDVarArray(num_states=num_of_samples, shape=(horizon, len(a_vars)))
     f_states = vgroup.NDVarArray(num_states=num_of_samples, shape=(horizon, len(s_vars)))
 
-    default_act = 'noop'
-    len_of_cases = len(reward_dist[default_act]['parents'])
-    f_p_rwds = vgroup.NDVarArray(num_states=2, shape=(horizon, len_of_cases+1))
-    f_p_cumus = vgroup.NDVarArray(num_states=2, shape=(horizon, len_of_cases+1))
+    f_p_rwds = vgroup.NDVarArray(num_states=2, shape=(horizon, len(r_vars)+1))
+    f_p_cumus = vgroup.NDVarArray(num_states=2, shape=(horizon, len(r_vars)+1))
     
     f_rwds = vgroup.NDVarArray(num_states=2, shape=(horizon,))
     f_cumus = vgroup.NDVarArray(num_states=2, shape=(horizon+1,))
     
     fg = fgraph.FactorGraph(variable_groups=[f_actions, f_states, f_p_rwds, f_p_cumus, f_rwds, f_cumus])
 
+    # particle generation
+    np.random.seed(random_seed)
+
+    mixture_mean = np.ones((total_num_vars, num_mixture))
+    mixture_std = np.ones((total_num_vars, num_mixture))
+    mixture_weight = np.ones((total_num_vars, num_mixture))/num_mixture
+
+    #? Could the for loop be removed?
+    z = np.ones((total_num_vars, num_mixture))
+    for i in range(len(z)):
+        z[i] = z[i] * np.random.multinomial(1, mixture_weight[i])
+    
+    mean = np.sum(mixture_mean * z, axis = 1)
+    std = np.sum(mixture_std * z, axis = 1)
+    particles = np.random.normal(mean, std, (num_of_samples, total_num_vars, num_mixture))
     connecting_factor_vars = []
     policy_f_dists = []
     completed_factors = []
