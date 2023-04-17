@@ -4,6 +4,13 @@ import numpy as np
 import itertools
 
 
+def extract_factors(particles, dist = None):
+    '''
+    Extract the factor distribution on particles
+    '''
+    pass
+
+
 def init_samples(num_of_samples, random_seed, num_mixture, reward_dist, connect_dist, trans_prob, policy, s_vars, a_vars, r_vars, horizon):
     '''
     Generate dynamic bayesian network structure.
@@ -26,21 +33,37 @@ def init_samples(num_of_samples, random_seed, num_mixture, reward_dist, connect_
     # particle generation
     np.random.seed(random_seed)
 
-    mixture_mean = np.ones((total_num_vars, num_mixture))
-    mixture_std = np.ones((total_num_vars, num_mixture))
-    mixture_weight = np.ones((total_num_vars, num_mixture))/num_mixture
+    mixture_mean = np.ones((horizon, total_num_vars, num_mixture))
+    mixture_std = np.ones((horizon, total_num_vars, num_mixture))
+    mixture_weight = np.ones((horizon, total_num_vars, num_mixture))/num_mixture
 
     #? Could the for loop be removed?
-    z = np.ones((total_num_vars, num_mixture))
-    for i in range(len(z)):
-        z[i] = z[i] * np.random.multinomial(1, mixture_weight[i])
+    z = np.ones((horizon, total_num_vars, num_mixture))
+    for i in range(horizon):
+        for j in range(total_num_vars):
+            z[i][j] = z[i][j] * np.random.multinomial(1, mixture_weight[i][j])
     
-    mean = np.sum(mixture_mean * z, axis = 1)
-    std = np.sum(mixture_std * z, axis = 1)
-    particles = np.random.normal(mean, std, (num_of_samples, total_num_vars, num_mixture))
-    connecting_factor_vars = []
-    policy_f_dists = []
+    mean = np.sum(mixture_mean * z, axis = -1)
+    std = np.sum(mixture_std * z, axis = -1)
+    particles = np.random.normal(mean, std, (num_of_samples, horizon, total_num_vars))
+
+    #? Could it be rewritten into a class to avoid multiple parameter passing?
+    extract_factors(particles)
     completed_factors = []
+    completed_factors.append(F.enum.EnumFactor(
+        variables=fg_vars,
+        factor_configs=f_configs,
+        log_potentials=np.log(trans_f_dist.flatten()),))
+    
+
+
+
+
+
+
+
+
+
     for time_step in range(0, horizon):
         time_stamp = str(time_step)
         next_time = time_step + 1
