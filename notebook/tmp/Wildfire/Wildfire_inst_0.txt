@@ -1,0 +1,26 @@
+DBN dependency analysis
+
+Domain: Wildfire
+Instance: 0
+
+Grounded fluent                         Parent variables                                                                                    
+
+burning'(?x1,?y1)                       burning(?x1,?y1), burning(?x1,?y2), burning(?x2,?y1), burning(?x2,?y2), out-of-fuel(?x1,?y1), put-out(?x1,?y1)
+burning'(?x1,?y2)                       burning(?x1,?y1), burning(?x1,?y2), burning(?x1,?y3), burning(?x2,?y1), burning(?x2,?y2), burning(?x2,?y3), out-of-fuel(?x1,?y2), put-out(?x1,?y2)
+burning'(?x1,?y3)                       burning(?x1,?y3), burning(?x2,?y2), burning(?x2,?y3), out-of-fuel(?x1,?y3), put-out(?x1,?y3)        
+burning'(?x2,?y1)                       burning(?x1,?y1), burning(?x1,?y2), burning(?x2,?y1), burning(?x2,?y2), burning(?x3,?y1), burning(?x3,?y2), out-of-fuel(?x2,?y1), put-out(?x2,?y1)
+burning'(?x2,?y2)                       burning(?x1,?y1), burning(?x1,?y2), burning(?x1,?y3), burning(?x2,?y1), burning(?x2,?y2), burning(?x2,?y3), burning(?x3,?y1), burning(?x3,?y2), burning(?x3,?y3), out-of-fuel(?x2,?y2), put-out(?x2,?y2)
+burning'(?x2,?y3)                       burning(?x1,?y2), burning(?x1,?y3), burning(?x2,?y2), burning(?x2,?y3), burning(?x3,?y2), burning(?x3,?y3), out-of-fuel(?x2,?y3), put-out(?x2,?y3)
+burning'(?x3,?y1)                       burning(?x2,?y1), burning(?x2,?y2), burning(?x3,?y1), burning(?x3,?y2), out-of-fuel(?x3,?y1), put-out(?x3,?y1)
+burning'(?x3,?y2)                       burning(?x2,?y1), burning(?x2,?y2), burning(?x2,?y3), burning(?x3,?y1), burning(?x3,?y2), burning(?x3,?y3), out-of-fuel(?x3,?y2), put-out(?x3,?y2)
+burning'(?x3,?y3)                       burning(?x2,?y2), burning(?x2,?y3), burning(?x3,?y2), burning(?x3,?y3), out-of-fuel(?x3,?y3), put-out(?x3,?y3)
+out-of-fuel'(?x1,?y1)                   burning(?x1,?y1), cut-out(?x1,?y1), out-of-fuel(?x1,?y1)                                            
+out-of-fuel'(?x1,?y2)                   burning(?x1,?y2), cut-out(?x1,?y2), out-of-fuel(?x1,?y2)                                            
+out-of-fuel'(?x1,?y3)                   burning(?x1,?y3), cut-out(?x1,?y3), out-of-fuel(?x1,?y3)                                            
+out-of-fuel'(?x2,?y1)                   burning(?x2,?y1), cut-out(?x2,?y1), out-of-fuel(?x2,?y1)                                            
+out-of-fuel'(?x2,?y2)                   burning(?x2,?y2), out-of-fuel(?x2,?y2)                                                              
+out-of-fuel'(?x2,?y3)                   burning(?x2,?y3), out-of-fuel(?x2,?y3)                                                              
+out-of-fuel'(?x3,?y1)                   burning(?x3,?y1), out-of-fuel(?x3,?y1)                                                              
+out-of-fuel'(?x3,?y2)                   burning(?x3,?y2), cut-out(?x3,?y2), out-of-fuel(?x3,?y2)                                            
+out-of-fuel'(?x3,?y3)                   burning(?x3,?y3), cut-out(?x3,?y3), out-of-fuel(?x3,?y3)                                            
+reward                                  burning(?x1,?y1), burning(?x1,?y2), burning(?x1,?y3), burning(?x2,?y1), burning(?x2,?y2), burning(?x2,?y3), burning(?x3,?y1), burning(?x3,?y2), burning(?x3,?y3), cut-out(?x1,?y1), cut-out(?x1,?y2), cut-out(?x1,?y3), cut-out(?x2,?y1), cut-out(?x2,?y2), cut-out(?x2,?y3), cut-out(?x3,?y1), cut-out(?x3,?y2), cut-out(?x3,?y3), out-of-fuel(?x2,?y2), out-of-fuel(?x2,?y3), out-of-fuel(?x3,?y1), put-out(?x1,?y1), put-out(?x1,?y2), put-out(?x1,?y3), put-out(?x2,?y1), put-out(?x2,?y2), put-out(?x2,?y3), put-out(?x3,?y1), put-out(?x3,?y2), put-out(?x3,?y3)
