@@ -1,288 +1,148 @@
 from pgmax import fgraph, vgroup, fgroup
 from pgmax import factor as F
+from pgmax import fgraph, fgroup, infer, vgroup
 import numpy as np
 import itertools
 
 
 def extract_factors(particles, dist = None):
     '''
-    Extract the factor distribution on particles
+    Read from XADD file to get factor dependence
+    return: list -- parent variables + child variable 
     '''
     pass
 
 
-def init_samples(num_of_samples, random_seed, num_mixture, reward_dist, connect_dist, trans_prob, policy, s_vars, a_vars, r_vars, horizon):
+def extract_ft_dist():
+    '''
+    Using simulator to generate a lot of samples and calculate the experimental probability
+    '''
+    pass
+
+
+def get_ft_var(factor, time):
+    '''
+    Generate variables of a factor at a certain time
+    '''
+    pass
+
+
+def get_config(subs):
+    '''
+    Transform list to np array of value grounding
+    '''
+    pass
+
+
+class MIX_MODEL:
+
+    def __init__(self, num_mixture, total_num_vars, horizon):
+        '''
+        dimension of the mixture model: horizon x (state var + action var + reward) x number of mixture 
+        '''
+        self.num_mixture = num_mixture
+        self.num_vars = total_num_vars
+        self.horizon = horizon
+        self.mixture_mean = np.ones((horizon, total_num_vars, num_mixture))
+        self.mixture_std = np.ones((horizon, total_num_vars, num_mixture))
+        self.mixture_weight = np.ones((horizon, total_num_vars, num_mixture))/num_mixture
+
+
+def update_dbn(model, num_samples, random_seed, num_mixture, s_vars, a_vars, horizon):
     '''
     Generate dynamic bayesian network structure.
+    s_vars: list -- a list of state variable
+    a_vars: list -- a list of action variable
+    horizon: int -- search depth
+    
     '''
 
     # create variable for factored DBN 
-    total_num_vars = len(s_vars) + len(a_vars)
+    total_num_vars = len(s_vars) + len(a_vars) + 1 # reward variables
 
-    f_actions = vgroup.NDVarArray(num_states=num_of_samples, shape=(horizon, len(a_vars)))
-    f_states = vgroup.NDVarArray(num_states=num_of_samples, shape=(horizon, len(s_vars)))
 
-    f_p_rwds = vgroup.NDVarArray(num_states=2, shape=(horizon, len(r_vars)+1))
-    f_p_cumus = vgroup.NDVarArray(num_states=2, shape=(horizon, len(r_vars)+1))
+    f_actions = vgroup.NDVarArray(num_states=num_samples, shape=(horizon, len(a_vars)))
+    f_states = vgroup.NDVarArray(num_states=num_samples, shape=(horizon, len(s_vars)))
     
     f_rwds = vgroup.NDVarArray(num_states=2, shape=(horizon,))
     f_cumus = vgroup.NDVarArray(num_states=2, shape=(horizon+1,))
     
-    fg = fgraph.FactorGraph(variable_groups=[f_actions, f_states, f_p_rwds, f_p_cumus, f_rwds, f_cumus])
+    fg = fgraph.FactorGraph(variable_groups=[f_actions, f_states, f_rwds, f_cumus])
 
     # particle generation
     np.random.seed(random_seed)
-
-    mixture_mean = np.ones((horizon, total_num_vars, num_mixture))
-    mixture_std = np.ones((horizon, total_num_vars, num_mixture))
-    mixture_weight = np.ones((horizon, total_num_vars, num_mixture))/num_mixture
 
     #? Could the for loop be removed?
     z = np.ones((horizon, total_num_vars, num_mixture))
     for i in range(horizon):
         for j in range(total_num_vars):
-            z[i][j] = z[i][j] * np.random.multinomial(1, mixture_weight[i][j])
+            z[i][j] = z[i][j] * np.random.multinomial(1, model.mixture_weight[i][j])
     
-    mean = np.sum(mixture_mean * z, axis = -1)
-    std = np.sum(mixture_std * z, axis = -1)
-    particles = np.random.normal(mean, std, (num_of_samples, horizon, total_num_vars))
+    mean = np.sum(model.mixture_mean * z, axis = -1)
+    std = np.sum(model.mixture_std * z, axis = -1)
+    particles = np.random.normal(mean, std, (num_samples, horizon, total_num_vars))
 
     #? Could it be rewritten into a class to avoid multiple parameter passing?
-    extract_factors(particles)
+    factors = extract_factors()
+    entry = {'subs': [], 'probs': []}
+
     completed_factors = []
-    completed_factors.append(F.enum.EnumFactor(
-        variables=fg_vars,
-        factor_configs=f_configs,
-        log_potentials=np.log(trans_f_dist.flatten()),))
+    for t_step in range(0, horizon-1):
+        p_table = dict.fromkeys(factors, entry)
+        for s_id in range(0, num_samples):
+            state = dict(zip(s_vars, particles[s_id][t_step][0: len(s_vars)]))
+            action = dict(zip(a_vars, particles[s_id][t_step][len(s_vars)+1:len(s_vars)+len(a_vars)]))
+            next_state =  dict(zip(s_vars, particles[s_id][t_step+1][0: len(s_vars)]))
+            factors, subs, probs = extract_ft_dist(state, action, next_state)
+            for ft, s, p in zip(factors, subs, probs):
+                p_table[ft]['subs'].append(s)
+                p_table[ft]['probs'].append(p)
+        
+        for ft in p_table.keys():
+            completed_factors.append(F.enum.EnumFactor(
+                variables=get_ft_var(ft, t_step),
+                factor_configs=get_config(p_table[ft]['subs']),
+                log_potentials=np.log(np.array(p_table[ft]['probs'])),))
     
-
-
-
-
-
-
-
-
-
-    for time_step in range(0, horizon):
-        time_stamp = str(time_step)
-        next_time = time_step + 1
-        next_stamp = str(next_time)
-        prev_time = time_step - 1
-        prev_stamp = str(prev_time)
-
-        policy_factor_vars = []
-        factor_var = []
-        factor_var.append("t" + time_stamp + "_atomic_action")
-        policy_factor_vars.append(factor_var)
-        for idx, factor_var in enumerate(policy_factor_vars):
-            policy_f_dist = generate_factor_dist(time_step, s_vars, a_vars, valid_actions, atomic_action_lst, "policy", factor_var, policy, mes_type, a_mask)
-            policy_f_dists.append(policy_f_dist)
-        
-        if (time_step != 0):
-            trans_factor_vars = []
-            f_var_names = []
-            for cs_idx, s_var in enumerate(s_vars):
-                child_var = s_var + "'"
-                factor_var = []
-                f_var_name = []
-
-                for curr_s_var in state_dependency[child_var]:
-                    ps_idx = s_vars.index(curr_s_var)
-                    factor_var.append("t" + prev_stamp + "_" + curr_s_var)
-                    f_var_name.append(f_states[prev_time, ps_idx])
-                    if (time_step == 1):
-                        if (not curr_s_var in init_candids):
-                            init_candids.append(curr_s_var)
-
-                factor_var.append("t" + prev_stamp + "_atomic_action")
-                factor_var.append("t" + time_stamp + "_" + s_var)
-                f_var_name.append(f_actions[prev_time])
-                f_var_name.append(f_states[time_step, cs_idx])
-
-                trans_factor_vars.append(factor_var)
-                f_var_names.append(f_var_name)
-
-            for landing_s, factor_var, fg_vars in zip(s_vars, trans_factor_vars, f_var_names):
-                parent_s = state_dependency[landing_s + "'"]
-                trans_f_dist = generate_factor_dist(time_step, parent_s, a_vars, valid_actions, atomic_action_lst, "trans", factor_var, trans_prob, mes_type, a_mask)
-
-                s_configs = np.array(list(itertools.product(np.arange(2), repeat=len(fg_vars)-2)))
-                s_dim = len(s_configs)
-                s_configs = np.repeat(s_configs, len(atomic_action_lst), axis=0)
-                a_configs = np.array(list(range(len(atomic_action_lst))))
-                a_configs = np.tile(a_configs, (s_dim, 1))
-                a_configs = a_configs.reshape((-1, 1))
-                p_configs = np.append(s_configs, a_configs, axis=1)
-                c_dim = len(p_configs)
-                p_configs = np.repeat(p_configs, 2, axis=0)
-                p_configs = p_configs.reshape((int(c_dim*2), -1))
-                c_configs = np.array([0, 1])
-                c_configs = np.tile(c_configs, (c_dim, 1))
-                c_configs = c_configs.reshape((-1, 1))
-                f_configs = np.append(p_configs, c_configs, axis=1)
-                f_configs = f_configs.astype(int)
-
-                completed_factors.append(F.enum.EnumFactor(
-                    variables=fg_vars,
-                    factor_configs=f_configs,
-                    log_potentials=np.log(trans_f_dist.flatten()),))
-
-        # Reformulation of rewards
-
-        # because all action share the same reward table except for the intrinsic action cost. (we omit 2 domains that fail this assumption)
-        # we only need to set one action to enumerate the state-dependent reward table
-        default_act = 'noop'
-        len_of_cases = len(reward_dist[default_act]['parents'])
-
-        partial_rwd_s_factor_vars = []
-        r_f_vars = []
-        for idx in range(0, len_of_cases):
-            factor_var = []
-            r_f_var = []
-            for svar in reward_dist[default_act]['parents'][idx]:
-                ps_idx = s_vars.index(svar)
-                factor_var.append("t" + time_stamp + "_" + svar)
-                r_f_var.append(f_states[time_step, ps_idx])
-                if (not svar in init_candids):
-                    init_candids.append(svar)
-            factor_var.append("t" + next_stamp + "_pr" + str(idx+1))
-            r_f_var.append(f_p_rwds[ary_idx(next_time), idx])
-            partial_rwd_s_factor_vars.append(factor_var)
-            r_f_vars.append(r_f_var)
-
-        # formalize distribution for factor nodes
-
-        for case, vars, factor_var, r_factor in zip(reward_dist[default_act]['cases'], reward_dist[default_act]['parents'], partial_rwd_s_factor_vars, r_f_vars):
-            r_f_configs = np.array(list(itertools.product(np.arange(2), repeat=len(r_factor))))
-            pr_s_f_dist = generate_factor_dist(next_time, vars, None, None, None, "partial_s_rwd", normal_factor, case, mes_type, a_mask)
-
-            completed_factors.append(F.enum.EnumFactor(
-                variables=r_factor,
-                factor_configs=r_f_configs,
-                log_potentials=np.log(pr_s_f_dist.flatten()),))
-
-        partial_rwd_a_factor_vars = []
-        r_a_f_vars = []
-        factor_var = []
-        r_a_f_var = []
-        factor_var.append("t" + time_stamp + "_atomic_action" )
-        factor_var.append("t" + next_stamp + "_pr" + str(len_of_cases + 1))
-        r_a_f_var.append(f_actions[time_step])
-        r_a_f_var.append(f_p_rwds[ary_idx(next_time), len_of_cases])
-        partial_rwd_a_factor_vars.append(factor_var)
-        r_a_f_vars.append(r_a_f_var)
-        # formalize distribution for factor nodes
-        for factor_var, r_factor in zip(partial_rwd_a_factor_vars, r_a_f_vars):
-            r_a_configs = np.array(list(range(len(atomic_action_lst))))
-            r_a_configs = np.repeat(r_a_configs, 2, axis=0)
-            r_configs = np.array([0, 1])
-            r_configs = np.tile(r_configs, (len(atomic_action_lst), 1))
-            r_a_configs = r_a_configs.reshape((-1, 1))
-            r_configs = r_configs.reshape((-1, 1))
-            f_configs = np.append(r_a_configs, r_configs, axis=1)
-
-            pr_a_f_dist = generate_factor_dist(next_time, None, None, None, None, "partial_a_rwd", normal_factor, reward_dist, mes_type, a_mask)
-
-            fg.add_factors(F.enum.EnumFactor(
-                variables=r_factor,
-                factor_configs=f_configs,
-                log_potentials=np.log(pr_a_f_dist.flatten()),))
-
-        completed_factors.append(F.enum.EnumFactor(
-            variables=[(f_p_cumus[ary_idx(next_time), 0])],
-            factor_configs=np.arange(2)[:, None],
-            log_potentials=np.log(np.array([0.0001, 0.9999])),))
-        
-        cumu_rwd_factor_vars = []
-        cumu_f_vars = []
-        for idx in range(0, len_of_cases):
-            factor_var = []
-            cumu_f_var = []
-            factor_var.append("t" + next_stamp + "_cr" + str(idx))
-            factor_var.append("t" + next_stamp + "_pr" + str(idx+1))
-            factor_var.append("t" + next_stamp + "_cr" + str(idx+1))
-
-            cumu_f_var.append(f_p_cumus[ary_idx(next_time), idx])
-            cumu_f_var.append(f_p_rwds[ary_idx(next_time), ary_idx(idx+1)])
-            cumu_f_var.append(f_p_cumus[ary_idx(next_time), idx+1])
-            cumu_rwd_factor_vars.append(factor_var)
-            cumu_f_vars.append(cumu_f_var)
-        # Final step reward
-        factor_var = []
-        cumu_f_var = []
-        factor_var.append("t" + next_stamp + "_cr" + str(len_of_cases))
-        factor_var.append("t" + next_stamp + "_pr" + str(len_of_cases+1))
-        factor_var.append("r" + next_stamp)
-
-        cumu_f_var.append(f_p_cumus[ary_idx(next_time), len_of_cases])
-        cumu_f_var.append(f_p_rwds[ary_idx(next_time), ary_idx(len_of_cases+1)])
-        cumu_f_var.append(f_rwds[ary_idx(next_time)])
-        cumu_rwd_factor_vars.append(factor_var)
-        cumu_f_vars.append(cumu_f_var)
-
-        # formalize distribution for factor nodes
-        auxiliary_dist = generate_connect_distribution(len_of_cases + 1)
-
-        for idx, factor_var, cumu_f_var in zip(list(range(len(cumu_rwd_factor_vars))), cumu_rwd_factor_vars, cumu_f_vars):
-            f_configs = np.array(list(itertools.product(np.arange(2), repeat=len(cumu_f_var))))
-            aux_r_dist = np.array([[[1 - auxiliary_dist[idx+1]['00'], auxiliary_dist[idx+1]['00']], [1 - auxiliary_dist[idx+1]['01'], auxiliary_dist[idx+1]['01']]], [[1 - auxiliary_dist[idx+1]['10'], auxiliary_dist[idx+1]['10']], [1 - auxiliary_dist[idx+1]['11'], auxiliary_dist[idx+1]['11']]]])
-
-            completed_factors.append(F.enum.EnumFactor(
-                variables=cumu_f_var,
-                factor_configs=f_configs,
-                log_potentials=np.log(aux_r_dist.flatten()),))
-
-
-        # trick to connect reward of different time slice
-        connecting_factor_vars = []
-        connecting_factor_vars.append("c" + time_stamp)
-        connecting_factor_vars.append("r" + next_stamp)
-        connecting_factor_vars.append("c" + next_stamp)
-
-        connect_f_vars = []
-        connect_f_vars.append(f_cumus[time_step])
-        connect_f_vars.append(f_rwds[ary_idx(next_time)])
-        connect_f_vars.append(f_cumus[next_time])
-
-        con_f_dist_raw = np.array([[[1 - connect_dist[next_time]['00'], connect_dist[next_time]['00']], [1 - connect_dist[next_time]['01'], connect_dist[next_time]['01']]], [[1 - connect_dist[next_time]['10'], connect_dist[next_time]['10']], [1 - connect_dist[next_time]['11'], connect_dist[next_time]['11']]]])
-        if (mes_type == 'bw' and next_time == horizon):
-            # backward loopy bp formulation
-            ob_mask = np.array([[[0.0001, 0.9999], [0.0001, 0.9999]],[[0.0001, 0.9999], [0.0001, 0.9999]]])
-        else:
-            ob_mask = np.array([[[1.0, 1.0], [1.0, 1.0]],[[1.0, 1.0], [1.0, 1.0]]])
-        con_f_dist = np.multiply(con_f_dist_raw, ob_mask)
-
-        f_configs = np.array(list(itertools.product(np.arange(2), repeat=len(connect_f_vars))))
-        completed_factors.append(F.enum.EnumFactor(
-            variables=connect_f_vars,
-            factor_configs=f_configs,
-            log_potentials=np.log(con_f_dist.flatten()),))
-
-    policy_unaries = fgroup.EnumFactorGroup(
-        variables_for_factors=[[f_actions[t]] for t in range(0, horizon)],
-        factor_configs=np.arange(len(atomic_action_lst))[:, None],
-        log_potentials=np.stack(policy_f_dists, axis=0),
-    )
-
-    completed_factors.insert(0, policy_unaries)
-
-    completed_factors.insert(0, F.enum.EnumFactor(
-        variables=[f_cumus[0]],
-        factor_configs=np.arange(2)[:, None],
-        log_potentials=np.log(np.array([0.0001, 0.9999])),))
-
-    init_vs = []
-    for s_var in init_candids:
-        init_s_idx = s_vars.index(s_var)
-        init_vs.append([f_states[0, init_s_idx]])
-    init_unaries = fgroup.EnumFactorGroup(
-        variables_for_factors=init_vs,
-        factor_configs=np.arange(2)[:, None],
-        log_potentials=np.stack([np.zeros(len(init_candids)), np.ones(len(init_candids))], axis=1),
-    )
-
-    completed_factors.insert(0, init_unaries)
     fg.add_factors(completed_factors)
 
-    return [fg, init_candids, policy_unaries, init_unaries]
+    # connect distribution factor remains to be added
+    return fg, particles
+
+
+def normpdf(x, mean, sd):
+    var = float(sd)**2
+    denom = (2*np.pi*var)**.5
+    num = np.exp(-(float(x)-float(mean))**2/(2*var))
+    return num/denom
+
+
+def update_model(fg, model, num_samples):
+    bp = infer.BP(fg.bp_state)
+    bp.init()
+    bp_arrays = bp.run_bp(bp_arrays, num_iters=10, damping=0.5)
+    values, probs = bp.get_beliefs(bp_arrays)
+    beliefs_match_mix = np.stack(probs, model.num_mixture)
+    values_match_mix = np.stack(values, model.num_mixture)
+    beliefs_match_mix = beliefs_match_mix.reshape((model.horizon, model.num_vars, model.num_mixture))
+    values_match_mix = values_match_mix.reshape((model.horizon, model.num_vars, model.num_mixture))
+
+    z_matrix = model.mixture_weight*beliefs_match_mix*normpdf(values_match_mix, model.mixture_mean, model.mixture_std)
+    gamma_z = z_matrix/np.sum(z_matrix, axis=-1)
+
+    N_matrix = np.sum(gamma_z, axis = 0)
+
+    model.mixture_mean = gamma_z * beliefs_match_mix * values_match_mix/N_matrix
+    model.mixture_std = gamma_z * (beliefs_match_mix * (values_match_mix - model.mixture_mean))^2/N_matrix
+    model.mixture_weight = N_matrix/num_samples
+    return model
+
+
+def mepbp(domain_ins, num_mixture, horizon, num_samples, seed, iter = 100):
+    total_num_vars = len(domain_ins.s_vars) + len(domain_ins.a_vars) + 1 
+    model = MIX_MODEL(num_mixture, total_num_vars, horizon)
+    for _ in range(iter):
+        fg = update_dbn(model, num_samples, seed, num_mixture, domain_ins.s_vars, domain_ins.a_vars, horizon)
+        model = update_model(fg, model, num_samples)
+    
+         
